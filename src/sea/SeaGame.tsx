@@ -59,6 +59,14 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
   const skipCoach = () => { setCoach(-1); setBcoach(-1); done(); };
   const flag = (f: string) => { const L = live.current; if (!st.battle && L.coach >= 0 && COACH[L.coach]?.wait === f) nextCoach(); if (st.battle && L.bcoach >= 0 && BATTLE_COACH[L.bcoach]?.wait === f) nextB(); };
 
+  useEffect(() => { if (menu && !st.battle && !st.result && !st.pending) save('save.sea', st); }, [menu]);
+  const checkDone = () => {
+    if (st.result && !ui.current.done) {
+        ui.current.done = true; remove('save.sea'); sfx(st.result.winner === 0 ? 'win' : 'lose');
+        const afloat = st.ships.filter((s) => s.side === 0 && !s.sunk).length;
+        setTimeout(() => p.onResult({ mode: 'sea', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Enemy ships sunk', st.stats.sunk], ['Prizes taken', st.stats.captured], ['Ships lost', st.stats.lost], ['Ships taken by the enemy', st.stats.taken], ['Battles fought', st.stats.battles], ['Ships under your flag', afloat]] }), 1400);
+      }
+  };
   const canvasRef = useGameCanvas({
     paused: paused || menu || help, speed,
     step: (dt) => {
@@ -70,14 +78,10 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
         else if (e === 'battle-won') sfx('capture'); else if (e === 'battle-lost') sfx('lose');
       }
       st.events.length = 0;
-      if (st.result && !ui.current.done) {
-        ui.current.done = true; remove('save.sea'); sfx(st.result.winner === 0 ? 'win' : 'lose');
-        const afloat = st.ships.filter((s) => s.side === 0 && !s.sunk).length;
-        setTimeout(() => p.onResult({ mode: 'sea', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Enemy ships sunk', st.stats.sunk], ['Prizes taken', st.stats.captured], ['Ships lost', st.stats.lost], ['Ships taken by the enemy', st.stats.taken], ['Battles fought', st.stats.battles], ['Ships under your flag', afloat]] }), 1400);
-      }
+      checkDone();
     },
     draw: (ctx, w, h, t) => {
-      const u = ui.current;
+      const u = ui.current; checkDone();
       if (st.battle) { u.view = fitView(w, h, ARENA.w, ARENA.h, 12); drawSeaBattle(ctx, u.view, st, { selected: live.current.shipSel, t, reduced }, w, h); }
       else {
         u.view = fitView(w, h, SEA.w, SEA.h, 12);

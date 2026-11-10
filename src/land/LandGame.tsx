@@ -71,6 +71,14 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
   const nextCoach = () => { const i = live.current.coach; if (i + 1 >= COACH.length) { update({ tutorialDone: { ...settings.tutorialDone, land: true } }); setCoach(-1); } else setCoach(i + 1); };
   const skipCoach = () => { setCoach(-1); setBcoach(-1); update({ tutorialDone: { ...settings.tutorialDone, land: true } }); };
 
+  useEffect(() => { if (menu && !st.battle && !st.result) save('save.land', st); }, [menu]);
+  const checkDone = () => {
+    if (st.result && !ui.current.done) {
+        ui.current.done = true; remove('save.land'); sfx(st.result.winner === 0 ? 'win' : 'lose');
+        const own = st.squads.filter((s) => s.side === 0).reduce((a, s) => a + total(s.counts), 0);
+        setTimeout(() => p.onResult({ mode: 'land', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Battles won', st.stats.battlesWon], ['Battles lost', st.stats.battlesLost], ['Enemy soldiers felled', st.stats.kills], ['Soldiers lost', st.stats.losses], ['Soldiers remaining', own], ['Village', st.villageOwner === 0 ? 'Held' : 'Not held']] }), 1400);
+      }
+  };
   const canvasRef = useGameCanvas({
     paused: paused || menu || help, speed,
     step: (dt) => {
@@ -83,14 +91,10 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
         else if (e === 'village-lost') say('The enemy has taken Aldermere village.', true);
       }
       st.events.length = 0;
-      if (st.result && !ui.current.done) {
-        ui.current.done = true; remove('save.land'); sfx(st.result.winner === 0 ? 'win' : 'lose');
-        const own = st.squads.filter((s) => s.side === 0).reduce((a, s) => a + total(s.counts), 0);
-        setTimeout(() => p.onResult({ mode: 'land', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Battles won', st.stats.battlesWon], ['Battles lost', st.stats.battlesLost], ['Enemy soldiers felled', st.stats.kills], ['Soldiers lost', st.stats.losses], ['Soldiers remaining', own], ['Village', st.villageOwner === 0 ? 'Held' : 'Not held']] }), 1400);
-      }
+      checkDone();
     },
     draw: (ctx, w, h, t) => {
-      const u = ui.current;
+      const u = ui.current; checkDone();
       if (st.battle) { u.view = fitView(w, h, FIELD.w, FIELD.h, 12); drawBattle(ctx, u.view, st.battle, { group: live.current.group, t, reduced }); }
       else {
         u.view = fitView(w, h, WORLD.w, WORLD.h, 12);

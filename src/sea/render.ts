@@ -172,7 +172,7 @@ export const windFromName = (windTo: number) => COMPASS_PTS[((Math.round(angNorm
 
 /** Compass rose with the wind arrow; drawn in screen space. */
 export function drawCompass(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, windTo: number, heading: number | null) {
-  ctx.save(); ctx.translate(x, y);
+  ctx.save(); ctx.translate(x, y); const k = r / 44; ctx.scale(k, k); r = 44;
   ctx.fillStyle = 'rgba(16,40,54,0.78)'; ctx.beginPath(); ctx.arc(0, 0, r + 16, 0, TAU); ctx.fill();
   ctx.strokeStyle = BRASS; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r + 14, 0, TAU); ctx.stroke(); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, r + 9, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.stroke();
   for (let i = 0; i < 32; i++) { const a = (i / 32) * TAU, l = i % 4 === 0 ? 6 : 3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9)); ctx.lineTo(Math.cos(a) * (r + 9 - l), Math.sin(a) * (r + 9 - l)); ctx.stroke(); }
@@ -231,8 +231,8 @@ export function drawSea(ctx: CanvasRenderingContext2D, v: View, st: SeaState, ui
   if (ui.badAt) { const b = ui.badAt; ctx.strokeStyle = '#ff8d7a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, 9, 0, TAU); ctx.moveTo(b.x - 6, b.y - 6); ctx.lineTo(b.x + 6, b.y + 6); ctx.stroke(); }
   for (const q of st.squadrons) drawSquadron(ctx, st, q, q.id === ui.selected, q.id === ui.hover, t);
   ctx.restore(); ctx.restore();
-  const r = clamp(Math.min(cw, ch) * 0.07, 30, 52);
-  drawCompass(ctx, v.ox + 22 * v.scale + r + 18, v.oy + SEA.h * v.scale - 22 * v.scale - r - 44, r, st.wind, sel ? sel.heading : null);
+  const r = clamp(v.scale * 66, 16, 52);
+  drawCompass(ctx, v.ox + 22 * v.scale + r + 18, v.oy + SEA.h * v.scale - 22 * v.scale - r * 1.85, r, st.wind, sel ? sel.heading : null);
 }
 function drawSquadron(ctx: CanvasRenderingContext2D, st: SeaState, q: Squadron, sel: boolean, hover: boolean, t: number) {
   const ships = shipsOf(st, q), n = ships.length;
@@ -320,8 +320,8 @@ export function drawSeaBattle(ctx: CanvasRenderingContext2D, v: View, st: SeaSta
     }
   }
   ctx.restore(); ctx.restore();
-  const r = clamp(Math.min(cw, ch) * 0.075, 32, 56);
-  drawCompass(ctx, v.ox + 14 * v.scale + r + 18, v.oy + ARENA.h * v.scale - 14 * v.scale - r - 44, r, st.wind, sel ? sel.heading : null);
+  const r = clamp(v.scale * 60, 16, 56);
+  drawCompass(ctx, v.ox + 14 * v.scale + r + 18, v.oy + ARENA.h * v.scale - 14 * v.scale - r * 1.85, r, st.wind, sel ? sel.heading : null);
 }
 function drawUnit(ctx: CanvasRenderingContext2D, st: SeaState, b: SeaBattle, u: Unit, sel: boolean, t: number) {
   const s: Ship = shipOf(st, u), C = CLASS[s.cls];

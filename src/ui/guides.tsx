@@ -65,7 +65,7 @@ export const SeaGuide = () => (
       <li>Hull at zero sinks the ship. Damaged rigging cuts speed and turning. Lost crew slow reloading, thin the broadside and weaken boarding.</li>
       <li><b>Boarding</b> (a simplified action, resolved automatically): come within a pistol shot of an enemy with hull below {SEA.boardHull * 100}%, crew below {SEA.boardCrew * 100}% or rigging below {SEA.boardRig * 100}%, at a similar speed, and order <i>Board</i>. Both crews bleed until one breaks. Win and she is yours, manned by a prize crew taken from your ship; lose badly and your own ship may be taken.</li>
       <li>“Fire at will” lets gun crews fire whenever a target is in arc. “Engage” hands the helm to the ship’s captain; “Withdraw” runs for open sea.</li>
-      <li>A ship <b>disengages</b> by sailing off the edge of the battle with no enemy within {SEA.disengageRange} yards. The side that leaves falls back toward its home port.</li>
+      <li>A ship ordered to <b>Withdraw</b> disengages by sailing off the edge of the battle, provided no enemy is within {SEA.disengageRange} yards. Without that order she stays in the action. The side that leaves falls back toward its home port.</li>
       <li>Shoals in battle slow deep-draught ships to a crawl and damage their hulls; striking land stops a ship and damages her.</li>
       <li>All damage, losses and prizes carry back to the chart.</li>
     </ul>

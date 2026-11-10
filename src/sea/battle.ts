@@ -8,7 +8,7 @@ export interface Unit {
   ship: number; x: number; y: number; heading: number; speed: number; sail: 0 | 1 | 2;
   course: number; wp: Vec | null; reload: [number, number]; shot: Shot;
   st: 'active' | 'sunk' | 'escaped'; mode: 'manual' | 'engage' | 'withdraw'; fireAtWill: boolean;
-  grappled: boolean; boardCd: number; sinkT: number; aground: number; aiT: number; flash: number;
+  grappled: boolean; fleeing: boolean; boardCd: number; sinkT: number; aground: number; aiT: number; flash: number;
 }
 export interface Boarding { a: number; t: number; time: number; tick: number; a0: number; t0: number; done: '' | 'captured' | 'repelled' | 'reversed'; doneT: number }
 export interface SeaReport { winner: Side | -1; lines: string[]; sunk: string[]; captured: string[]; lost: string[]; taken: string[]; duration: number }
@@ -56,7 +56,7 @@ export function createSeaBattle(st: SeaState, squads: Squadron[], mid: Vec): Sea
       }
       const h = dir + Math.PI;
       b.units.push({ ship: s.id, x: px, y: py, heading: h, speed: CLASS[s.cls].speed * 0.3, sail: 1, course: h, wp: null, reload: [0, 0], shot: 'round', st: 'active',
-        mode: side === 1 || st.autoPlayer ? 'engage' : 'manual', fireAtWill: true, grappled: false, boardCd: 0, sinkT: 0, aground: 0, aiT: rand(st.rng) * 0.4, flash: 0 });
+        mode: side === 1 || st.autoPlayer ? 'engage' : 'manual', fireAtWill: true, grappled: false, fleeing: false, boardCd: 0, sinkT: 0, aground: 0, aiT: rand(st.rng) * 0.4, flash: 0 });
     });
   }
   return b;
@@ -176,7 +176,7 @@ export function stepSeaBattle(st: SeaState, dt: number) {
     if (u.grappled) { u.speed *= Math.max(0, 1 - dt * 2); continue; }
     if (u.mode !== 'manual') { u.aiT -= dt; if (u.aiT <= 0) { u.aiT = 0.35; shipAI(st, b, u); } }
     if (u.wp) { if (dist(u, u.wp) < 34) u.wp = null; else u.course = Math.atan2(u.wp.y - u.y, u.wp.x - u.x); }
-    const rate = C.turn * (0.45 + 0.55 * Math.min(1, u.speed / (C.speed * 0.45))) * (0.55 + (0.45 * s.rig) / 100);
+    const rate = C.turn * (0.6 + 0.4 * Math.min(1, u.speed / (C.speed * 0.45))) * (0.55 + (0.45 * s.rig) / 100);
     u.heading = angNorm(u.heading + clamp(angDiff(u.heading, u.course), -rate * dt, rate * dt));
     let target = maxSpeed(st, u);
     const here = tacTerrain(b, u.x, u.y);
@@ -196,7 +196,9 @@ export function stepSeaBattle(st: SeaState, dt: number) {
     // leaving the arena = disengaging
     if (u.x < 0 || u.y < 0 || u.x > ARENA.w || u.y > ARENA.h) {
       const near = act.some((e) => e !== u && e.st === 'active' && sideOf(st, e) !== s.side && dist(e, u) < SEA.disengageRange);
-      if (near) { u.x = clamp(u.x, 0, ARENA.w); u.y = clamp(u.y, 0, ARENA.h); if (s.side === 0) note(b, u, 'Cannot disengage — enemy too close'); }
+      const leaving = u.mode === 'withdraw' || u.fleeing;
+      if (!leaving) { u.x = clamp(u.x, 0, ARENA.w); u.y = clamp(u.y, 0, ARENA.h); if (s.side === 0) note(b, u, 'Order “Withdraw” to leave the action'); }
+      else if (near) { u.x = clamp(u.x, 0, ARENA.w); u.y = clamp(u.y, 0, ARENA.h); if (s.side === 0) note(b, u, 'Cannot disengage — enemy too close'); }
       else { u.st = 'escaped'; continue; }
     }
     if (u.fireAtWill) for (const side of [0, 1] as Broadside[]) if (u.reload[side] <= 0 && arcTarget(st, b, u, side)) fire(st, b, u, side);
@@ -205,11 +207,11 @@ export function stepSeaBattle(st: SeaState, dt: number) {
   for (let i = 0; i < act.length; i++) for (let j = i + 1; j < act.length; j++) {
     const p = act[i], q = act[j];
     if (p.st !== 'active' || q.st !== 'active' || (p.grappled && q.grappled)) continue;
-    const min = (CLASS[shipOf(st, p).cls].len + CLASS[shipOf(st, q).cls].len) * 0.3, dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+    const min = (CLASS[shipOf(st, p).cls].len + CLASS[shipOf(st, q).cls].len) * 0.36, dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
     if (d < min && d > 0.1) {
       const push = (min - d) * 0.5;
-      if (!p.grappled) { p.x -= (dx / d) * push; p.y -= (dy / d) * push; p.speed *= 1 - dt; }
-      if (!q.grappled) { q.x += (dx / d) * push; q.y += (dy / d) * push; q.speed *= 1 - dt; }
+      if (!p.grappled) { p.x -= (dx / d) * push; p.y -= (dy / d) * push; p.speed *= 1 - dt * 0.4; }
+      if (!q.grappled) { q.x += (dx / d) * push; q.y += (dy / d) * push; q.speed *= 1 - dt * 0.4; }
     }
   }
   // shot in flight
@@ -303,8 +305,9 @@ export function shipAI(st: SeaState, b: SeaBattle, u: Unit) {
   const ts = shipOf(st, tg), d = dist(u, tg), bearing = Math.atan2(tg.y - u.y, tg.x - u.x);
   const myPow = b.units.filter((x) => x.st === 'active' && sideOf(st, x) === me).reduce((a, x) => a + shipOf(st, x).hull, 0);
   const foePow = foes.reduce((a, x) => a + shipOf(st, x).hull, 0);
-  const flee = u.mode === 'withdraw' || (auto && s.hull < C.hull * (s.cls === 'flag' ? 0.4 : 0.22) && foePow > myPow * 0.6);
+  const flee = u.mode === 'withdraw' || (auto && s.hull < C.hull * (s.cls === 'flag' ? 0.3 : 0.22) && foePow > myPow * 0.6);
   let want: number, sail: 0 | 1 | 2 = 1;
+  u.fleeing = flee;
   if (flee) {
     const away = bearing + Math.PI;
     want = pointOfSail(away, st.wind) > 0.6 ? away : st.wind + (angDiff(st.wind, away) > 0 ? 0.5 : -0.5);
@@ -328,6 +331,11 @@ export function shipAI(st: SeaState, b: SeaBattle, u: Unit) {
     if (auto) u.shot = d < SEA.range * 0.5 && ts.crew > s.crew * 0.5 && s.crew > ts.crew ? 'grape' : (tg.mode === 'withdraw' || ts.hull < CLASS[ts.cls].hull * 0.25) && ts.rig > 40 && d > 120 ? 'chain' : 'round';
     if (wantBoard && canBoard(st, b, u, tg).ok) board(st, b, u, tg);
   }
+  // keep station: do not run aboard a consort
+  for (const f of b.units) if (f !== u && f.st === 'active' && sideOf(st, f) === me && !(tg === f)) {
+    const fd = dist(u, f);
+    if (fd < 150) { const rel = angDiff(want, Math.atan2(f.y - u.y, f.x - u.x)); if (Math.abs(rel) < 1.1) want -= (rel >= 0 ? 1 : -1) * 0.8 * (1 - fd / 150); }
+  }
   // steer clear of land, shoals and the arena edge
   const clear = (h: number) => {
     for (const r of [50, 100, 150]) {
@@ -338,6 +346,12 @@ export function shipAI(st: SeaState, b: SeaBattle, u: Unit) {
     return true;
   };
   if (!clear(want)) for (const off of [0.45, -0.45, 0.9, -0.9, 1.4, -1.4, 2, -2, 2.6, -2.6]) if (clear(want + off)) { want += off; break; }
+  // never settle on a heading inside the wind's eye: bear away to the nearer close-hauled tack
+  if (pointOfSail(want, st.wind) < 0.45) {
+    const up = st.wind + Math.PI, a1 = up + 1.0, a2 = up - 1.0;
+    const pick = Math.abs(angDiff(want, a1)) < Math.abs(angDiff(want, a2)) ? a1 : a2;
+    want = clear(pick) ? pick : clear(pick === a1 ? a2 : a1) ? (pick === a1 ? a2 : a1) : want;
+  }
   u.course = angNorm(want); u.wp = null; u.sail = sail;
 }
 const canBoardSoon = (ts: Ship) => { const T = CLASS[ts.cls]; return ts.hull <= T.hull * SEA.boardHull || ts.crew <= T.crew * SEA.boardCrew || ts.rig <= SEA.boardRig * 100; };

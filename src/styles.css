@@ -104,7 +104,7 @@ kbd { font-family: var(--sans); font-size: 11px; background: rgba(61,47,34,.12);
   .main { grid-template-columns: 1fr 224px; } .panel { padding: 6px; gap: 6px; } .scn, .clock { display: none; } .topbar .btn.ghost { padding: 6px; font-size: 12px; } .objective { font-size: 12px; }
   .brief, .modes { grid-template-columns: 1fr; } .sheet { padding: 16px; }
 }
-@media (max-width: 640px) and (orientation: portrait) {
+@media (max-width: 900px) and (orientation: portrait) {
   .main { grid-template-columns: 1fr; grid-template-rows: 1fr minmax(150px, 36dvh); } .panel { border-left: none; border-top: 3px double #6b5a45; }
   .topbar { flex-wrap: wrap; } .objective { order: 9; flex-basis: 100%; }
 }

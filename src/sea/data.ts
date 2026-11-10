@@ -13,7 +13,7 @@ export const SEA = {
   tacScale: 4,               // tactical arena shows a 320x200 slice of the chart at 4x
   stratSpeed: 0.25,           // strategic speed as a fraction of tactical speed
   encounterRange: 30, joinRange: 80,
-  portRange: 46, repairHull: 3.2, repairRig: 4, repairCrew: 2.4, // % of max per second while docked
+  portRange: 46, repairHull: 1.3, repairRig: 2.2, repairCrew: 1.1, // % of max per second while docked
   range: 300, arc: 0.61,     // broadside reach (px) and half-arc (rad, ~35 deg)
   rakeArc: 0.44, rakeMul: 1.6,
   fullSailRigVuln: 1.3, fullSailAim: 0.85,

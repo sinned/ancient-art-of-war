@@ -38,7 +38,7 @@ describe('sea: chart and wind', () => {
     const st = createSea(2); st.squadrons = st.squadrons.filter((q) => q.id === 1);
     const q = st.squadrons[0], s = st.ships[0]; s.hull = 40; s.rig = 30; s.crew = 50;
     expect(orderSail(st, 1, PORTS[2].x, PORTS[2].y + 10).ok).toBe(true);
-    run(st, 400);
+    run(st, 500);
     expect(Math.hypot(q.x - PORTS[2].x, q.y - PORTS[2].y)).toBeLessThan(SEA.portRange);
     expect(s.hull).toBeGreaterThan(90); expect(s.rig).toBeGreaterThan(90); expect(s.crew).toBeGreaterThan(100);
   });
@@ -131,10 +131,12 @@ describe('sea: tactical rules', () => {
   test('a ship can leave the action only when no enemy is close; damage follows her home', () => {
     const { st, b, mineU, foeU } = duel(10, 1, 4);
     const u = mineU[0], s = shipOf(st, u); s.hull = 33; mineU[1].st = 'escaped'; foeU.forEach((x, i) => { place(x, 1000, 300 + i * 120, 0); x.sail = 0; });
-    place(u, 4, 400, Math.PI, 30); u.sail = 2; place(foeU[0], 120, 400, Math.PI);
+    place(u, 4, 400, Math.PI, 30); u.sail = 2; u.fleeing = true; place(foeU[0], 120, 400, Math.PI);
     for (let i = 0; i < 60; i++) { u.course = Math.PI; stepSeaBattle(st, DT); }
     expect(u.st).toBe('active'); expect(u.x).toBeGreaterThanOrEqual(0);
-    place(foeU[0], 1000, 600, 0);
+    u.fleeing = false; for (let i = 0; i < 90; i++) { u.course = Math.PI; stepSeaBattle(st, DT); }
+    expect(u.st).toBe('active');                           // no order to withdraw: she stays in the action
+    u.fleeing = true; place(foeU[0], 1000, 600, 0);
     for (let i = 0; i < 30 * 20 && u.st === 'active'; i++) { u.course = Math.PI; stepSeaBattle(st, DT); }
     expect(u.st).toBe('escaped'); expect(b.phase).toBe('over'); expect(b.report!.winner).toBe(1);
     const sq = st.squadrons.find((q) => q.id === 1)!, x0 = sq.x;
