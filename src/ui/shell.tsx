@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Settings } from '../core/storage';
 import { fmtTime } from '../core/util';
+import { Cam, panBy, resetCam, zoomAt } from '../core/camera';
 
 export const STEP = 1 / 30;
 export const SettingsCtx = createContext<{ settings: Settings; update: (p: Partial<Settings>) => void; reduced: boolean }>(null as any);
@@ -105,5 +106,85 @@ export function PauseMenu(p: { onResume: () => void; onRestart: () => void; onQu
         <button className="btn big" onClick={p.onQuit}>Return to main menu</button>
       </div>
     </Modal>
+  );
+}
+
+/** Pointer data the game handlers need; clicks are delivered on release so a drag can pan instead. */
+export interface Tap { clientX: number; clientY: number; button: number; pointerType: string }
+
+/**
+ * Map input: wheel / pinch zoom, drag to pan (one finger, left or middle mouse), tap or click to act.
+ * Right-click acts immediately. Returns props to spread on the canvas.
+ */
+export function useMapInput(canvasRef: React.RefObject<HTMLCanvasElement | null>, cam: Cam, h: { tap: (e: Tap) => void; hover: (e: Tap) => void; leave: () => void }) {
+  const hr = useRef(h); hr.current = h;
+  const g = useRef({ pts: new Map<number, { x: number; y: number }>(), start: null as (Tap & { x: number; y: number }) | null, drag: false, pinch: 0, mid: { x: 0, y: 0 } });
+  useEffect(() => {
+    const cv = canvasRef.current!;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const p = canvasPoint(e, cv), d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      zoomAt(cam, Math.exp(-clampN(d, -120, 120) * (e.ctrlKey ? 0.01 : 0.0025)), p.x, p.y);
+    };
+    cv.addEventListener('wheel', wheel, { passive: false });
+    return () => cv.removeEventListener('wheel', wheel);
+  }, []);
+  const pinchState = () => { const [a, b] = [...g.current.pts.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; };
+  const tapOf = (e: React.PointerEvent): Tap => ({ clientX: e.clientX, clientY: e.clientY, button: e.button, pointerType: e.pointerType });
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      const s = g.current, p = canvasPoint(e, canvasRef.current!);
+      if (e.button === 2) { hr.current.tap(tapOf(e)); return; }
+      try { canvasRef.current!.setPointerCapture(e.pointerId); } catch { /* synthetic or already-released pointer */ }
+      s.pts.set(e.pointerId, p);
+      if (s.pts.size === 2) { s.start = null; const q = pinchState(); s.pinch = q.d; s.mid = q.m; }
+      else if (s.pts.size === 1) { s.start = { ...tapOf(e), ...p }; s.drag = e.button === 1; s.pinch = 0; }
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const s = g.current, p = canvasPoint(e, canvasRef.current!), prev = s.pts.get(e.pointerId);
+      if (!prev) { hr.current.hover(tapOf(e)); return; }
+      if (s.pts.size >= 2) {
+        s.pts.set(e.pointerId, p);
+        const q = pinchState();
+        if (s.pinch > 0) zoomAt(cam, q.d / s.pinch, q.m.x, q.m.y);
+        panBy(cam, q.m.x - s.mid.x, q.m.y - s.mid.y);
+        s.pinch = q.d; s.mid = q.m; return;
+      }
+      s.pts.set(e.pointerId, p);
+      if (s.start && !s.drag && Math.hypot(p.x - s.start.x, p.y - s.start.y) > (e.pointerType === 'mouse' ? 5 : 10)) {
+        s.drag = true; panBy(cam, p.x - s.start.x, p.y - s.start.y); return;
+      }
+      if (s.drag) panBy(cam, p.x - prev.x, p.y - prev.y);
+      else hr.current.hover(tapOf(e));
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const s = g.current;
+      if (!s.pts.delete(e.pointerId)) return;
+      if (s.pts.size === 0) { if (s.start && !s.drag) hr.current.tap(s.start); s.start = null; s.drag = false; s.pinch = 0; }
+      else { s.start = null; s.pinch = 0; const q = s.pts.size === 1 ? null : pinchState(); if (q) { s.pinch = q.d; s.mid = q.m; } else s.drag = true; }
+    },
+    onPointerCancel: (e: React.PointerEvent) => { const s = g.current; s.pts.delete(e.pointerId); if (!s.pts.size) { s.start = null; s.drag = false; } },
+    onPointerLeave: () => { if (!g.current.pts.size) hr.current.leave(); },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  };
+}
+const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+/** On-screen zoom buttons (also: + / − / 0 keys). */
+export function ZoomControls({ cam }: { cam: Cam }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '+' || e.key === '=') zoomAt(cam, 1.25); else if (e.key === '-' || e.key === '_') zoomAt(cam, 0.8); else if (e.key === '0') resetCam(cam);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [cam]);
+  return (
+    <div className="zoom">
+      <button className="btn" title="Zoom in (+, mouse wheel, pinch)" aria-label="Zoom in" onClick={() => zoomAt(cam, 1.4)}>+</button>
+      <button className="btn" title="Zoom out (−)" aria-label="Zoom out" onClick={() => zoomAt(cam, 1 / 1.4)}>−</button>
+      <button className="btn" title="Show whole map (0)" aria-label="Reset zoom" onClick={() => resetCam(cam)} disabled={cam.z <= 1.001}>⤢</button>
+    </div>
   );
 }

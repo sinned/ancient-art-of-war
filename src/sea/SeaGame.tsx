@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, fitView, toWorld } from '../core/draw';
+import { View, toWorld } from '../core/draw';
+import { camView, newCam } from '../core/camera';
 import { sfx } from '../core/audio';
 import { save, remove } from '../core/storage';
 import { Vec, angNorm, dist } from '../core/util';
-import { Bar, Coach, CoachStep, Modal, PauseMenu, Toast, TopBar, canvasPoint, useGameCanvas, useSettings, useToast } from '../ui/shell';
+import { Bar, Coach, CoachStep, Modal, PauseMenu, Toast, Tap, TopBar, ZoomControls, canvasPoint, useGameCanvas, useMapInput, useSettings, useToast } from '../ui/shell';
 import { CLASS, PORTS, SAIL_NAME, SEA, SHOT, SIDE_NAME, Shot, W, sailingName, pointOfSail } from './data';
 import { SeaState, Ship, Squadron, createSea, isDeep, orderSail, portFor, seaRoute, shipsOf, stepSea } from './sim';
 import { ARENA, Broadside, Unit, arcTarget, board, boardTarget, canBoard, concludeSeaBattle, fire, reloadTime, shipOf, tacTerrain } from './battle';
@@ -67,6 +68,7 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
         setTimeout(() => p.onResult({ mode: 'sea', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Enemy ships sunk', st.stats.sunk], ['Prizes taken', st.stats.captured], ['Ships lost', st.stats.lost], ['Ships taken by the enemy', st.stats.taken], ['Battles fought', st.stats.battles], ['Ships under your flag', afloat]] }), 1400);
       }
   };
+  const cam = useRef(newCam()).current;
   const canvasRef = useGameCanvas({
     paused: paused || menu || help, speed,
     step: (dt) => {
@@ -82,9 +84,9 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
     },
     draw: (ctx, w, h, t) => {
       const u = ui.current; checkDone();
-      if (st.battle) { u.view = fitView(w, h, ARENA.w, ARENA.h, 12); drawSeaBattle(ctx, u.view, st, { selected: live.current.shipSel, t, reduced }, w, h); }
+      if (st.battle) { u.view = camView(cam, 'battle', w, h, ARENA.w, ARENA.h, 3); drawSeaBattle(ctx, u.view, st, { selected: live.current.shipSel, t, reduced }, w, h); }
       else {
-        u.view = fitView(w, h, SEA.w, SEA.h, 12);
+        u.view = camView(cam, 'map', w, h, SEA.w, SEA.h, 4);
         if (u.badAt && t - u.badT > 1.2) u.badAt = null;
         drawSea(ctx, u.view, st, { selected: live.current.selected, hover: u.hover, preview: u.preview, badAt: u.badAt, t, reduced }, w, h);
         if (t - u.saveT > 5 && !st.result && !st.pending) { u.saveT = t; save('save.sea', st); }
@@ -114,7 +116,7 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
   const doBoard = () => { const u = need(); if (!u || !b) return; const t = boardTarget(st, b, u); if (!t) return say('No enemy ship to board.', true); const r = board(st, b, u, t); if (r.ok) say(`Boarders away! ${uship!.name} grapples ${shipOf(st, t).name}.`); else { sfx('deny'); say(r.reason!, true); } };
   const setMode = (m: Unit['mode'], all = false) => { if (!b) return; const us = all ? b.units.filter((u) => u.st === 'active' && shipOf(st, u).side === 0 && !u.grappled) : [need()].filter(Boolean) as Unit[]; for (const u of us) { u.mode = m; if (m === 'manual') { u.course = u.heading; u.wp = null; } } if (us.length) { sfx('order'); say(m === 'engage' ? 'Captains will engage the enemy on their own initiative.' : m === 'withdraw' ? 'Withdrawing — crowding sail for open water.' : 'You have the helm.'); } };
 
-  const onDown = (e: React.PointerEvent) => {
+  const onDown = (e: Tap) => {
     const w = toWorld(ui.current.view, ...Object.values(canvasPoint(e, canvasRef.current!)) as [number, number]);
     if (b) {
       if (b.phase === 'over') return;
@@ -135,13 +137,14 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
     if (sel) return doSail(w);
     if (q) { setInspect(q.id); sfx('click'); } else setInspect(null);
   };
-  const onMove = (e: React.PointerEvent) => {
+  const onMove = (e: Tap) => {
     if (b) return;
     const u = ui.current, w = toWorld(u.view, ...Object.values(canvasPoint(e, canvasRef.current!)) as [number, number]);
     u.hover = sqAt(w)?.id ?? null;
     const q = st.squadrons.find((x) => x.id === live.current.selected);
     u.preview = q && e.pointerType === 'mouse' ? (() => { const r = seaRoute(st, q, w.x, w.y); return r.path ? [{ x: q.x, y: q.y }, ...r.path] : null; })() : null;
   };
+  const input = useMapInput(canvasRef, cam, { tap: onDown, hover: onMove, leave: () => { ui.current.preview = null; ui.current.hover = null; } });
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const L = live.current, k = e.key.toLowerCase();
@@ -175,7 +178,8 @@ export function SeaGame(p: { resume?: SeaState | null; onExit: () => void; onRes
         time={st.time} paused={paused} setPaused={setPaused} speed={speed} setSpeed={setSpeed} onMenu={() => setMenu(true)} onHelp={() => setHelp(true)} />
       <div className="main">
         <div className="stage">
-          <canvas ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerLeave={() => { ui.current.preview = null; ui.current.hover = null; }} onContextMenu={(e) => e.preventDefault()} />
+          <canvas ref={canvasRef} {...input} />
+          <ZoomControls cam={cam} />
           {!b && coach >= 0 && <Coach steps={COACH} index={coach} onNext={nextCoach} onSkip={skipCoach} />}
           {b && b.phase !== 'over' && bcoach >= 0 && <Coach steps={BATTLE_COACH} index={bcoach} onNext={nextB} onSkip={skipCoach} />}
           {paused && !menu && !help && <div className="paused-tag">PAUSED</div>}

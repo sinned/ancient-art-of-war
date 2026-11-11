@@ -109,3 +109,5 @@ kbd { font-family: var(--sans); font-size: 11px; background: rgba(61,47,34,.12);
   .topbar { flex-wrap: wrap; } .objective { order: 9; flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 4; }
+.zoom .btn { width: 38px; height: 38px; padding: 0; font-size: 20px; line-height: 1; display: grid; place-items: center; }
