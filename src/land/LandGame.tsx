@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, fitView, toWorld } from '../core/draw';
+import { View, toWorld } from '../core/draw';
+import { camView, newCam } from '../core/camera';
 import { sfx } from '../core/audio';
 import { save, remove } from '../core/storage';
 import { Vec, dist } from '../core/util';
-import { Bar, Coach, CoachStep, Modal, PauseMenu, Toast, TopBar, canvasPoint, useGameCanvas, useSettings, useToast } from '../ui/shell';
+import { Bar, Coach, CoachStep, Modal, PauseMenu, Toast, Tap, TopBar, ZoomControls, canvasPoint, useGameCanvas, useMapInput, useSettings, useToast } from '../ui/shell';
 import { FORMATIONS, FormationId, LAND, PLACES, SIDE_NAME, Side, T, TERRAIN_NAME, TROOP, TYPES, TroopType, WORLD, tileAt } from './data';
 import { LandState, Squad, createLand, orderHalt, orderMove, routeTo, stepLand, total, fortPos, villagePos } from './sim';
 import { FIELD, Order, applyFormation, beginFight, concludeBattle, countAlive, setOrder, setRetreat } from './battle';
@@ -79,6 +80,7 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
         setTimeout(() => p.onResult({ mode: 'land', win: st.result!.winner === 0, reason: st.result!.reason, time: st.time, stats: [['Battles won', st.stats.battlesWon], ['Battles lost', st.stats.battlesLost], ['Enemy soldiers felled', st.stats.kills], ['Soldiers lost', st.stats.losses], ['Soldiers remaining', own], ['Village', st.villageOwner === 0 ? 'Held' : 'Not held']] }), 1400);
       }
   };
+  const cam = useRef(newCam()).current;
   const canvasRef = useGameCanvas({
     paused: paused || menu || help, speed,
     step: (dt) => {
@@ -95,9 +97,9 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
     },
     draw: (ctx, w, h, t) => {
       const u = ui.current; checkDone();
-      if (st.battle) { u.view = fitView(w, h, FIELD.w, FIELD.h, 12); drawBattle(ctx, u.view, st.battle, { group: live.current.group, t, reduced }); }
+      if (st.battle) { u.view = camView(cam, 'battle', w, h, FIELD.w, FIELD.h, 3); drawBattle(ctx, u.view, st.battle, { group: live.current.group, t, reduced }); }
       else {
-        u.view = fitView(w, h, WORLD.w, WORLD.h, 12);
+        u.view = camView(cam, 'map', w, h, WORLD.w, WORLD.h, 4);
         if (u.badAt && t - u.badT > 1.2) u.badAt = null;
         drawLand(ctx, u.view, st, { selected: live.current.selected, hoverSquad: u.hoverSquad, preview: u.preview, badAt: u.badAt, t, reduced });
         if (t - u.saveT > 5 && !st.result) { u.saveT = t; save('save.land', st); }
@@ -126,7 +128,7 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
   const begin = () => { if (st.battle?.phase === 'deploy') { beginFight(st); sfx('horn'); flag('begin'); setPaused(false); } };
   const retreat = () => { const b = st.battle; if (!b || b.phase !== 'fight') return say('Begin the battle first.', true); if (b.retreat[0]) return; setRetreat(b, 0); sfx('deny'); say('Retreat sounded — survivors who reach your edge will escape.'); };
 
-  const onDown = (e: React.PointerEvent) => {
+  const onDown = (e: Tap) => {
     const cv = canvasRef.current!, pt = canvasPoint(e, cv), w = toWorld(ui.current.view, pt.x, pt.y);
     const b = st.battle;
     if (b) {
@@ -149,7 +151,7 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
     if (s) { setInspect(s.id); sfx('click'); return; }
     setInspect(null);
   };
-  const onMove = (e: React.PointerEvent) => {
+  const onMove = (e: Tap) => {
     if (st.battle) return;
     const u = ui.current, w = toWorld(u.view, ...Object.values(canvasPoint(e, canvasRef.current!)) as [number, number]);
     u.hoverSquad = squadAt(w)?.id ?? null;
@@ -157,6 +159,7 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
     u.preview = s && e.pointerType === 'mouse' ? (() => { const r = routeTo(s, w.x, w.y); return r.path ? [{ x: s.x, y: s.y }, ...r.path] : null; })() : null;
   };
 
+  const input = useMapInput(canvasRef, cam, { tap: onDown, hover: onMove, leave: () => { ui.current.preview = null; ui.current.hoverSquad = null; } });
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const L = live.current, b = st.battle;
@@ -200,7 +203,8 @@ export function LandGame(p: { resume?: LandState | null; onExit: () => void; onR
         time={st.time} paused={paused} setPaused={(v) => { setPaused(v); flag('pause'); }} speed={speed} setSpeed={(v) => { setSpeed(v); flag('pause'); }} onMenu={() => setMenu(true)} onHelp={() => setHelp(true)} />
       <div className="main">
         <div className="stage">
-          <canvas ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerLeave={() => { ui.current.preview = null; ui.current.hoverSquad = null; }} onContextMenu={(e) => e.preventDefault()} />
+          <canvas ref={canvasRef} {...input} />
+          <ZoomControls cam={cam} />
           {!b && coach >= 0 && <Coach steps={COACH} index={coach} onNext={nextCoach} onSkip={skipCoach} />}
           {b && b.phase !== 'over' && bcoach >= 0 && <Coach steps={BATTLE_COACH} index={bcoach} onNext={() => setBcoach(-1)} onSkip={skipCoach} />}
           {b?.phase === 'deploy' && bcoach < 0 && <div className="banner"><h2>{b.names[0]} <i>meets</i> {b.names[1]}</h2><p>Choose a formation, then begin the battle.</p></div>}

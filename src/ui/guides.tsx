@@ -7,6 +7,7 @@ export const LandGuide = () => (
     <h3>Controls</h3>
     <table><tbody>
       <tr><td><b>Click / tap</b></td><td>Select a squad; then click a destination to march, or an enemy to attack. Right-click also orders a march.</td></tr>
+      <tr><td><b>Zoom</b></td><td>Mouse wheel or pinch to zoom; drag to pan. <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> or the buttons at bottom right.</td></tr>
       <tr><td><kbd>Space</kbd></td><td>Pause or resume. Orders can be given while paused.</td></tr>
       <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Map: select squad. Battle: All / Knights / Barbarians / Archers.</td></tr>
       <tr><td><kbd>A</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>F</kbd></td><td>Battle orders: Advance, aTtack, Hold, Fall back. <kbd>Enter</kbd> begins a battle. <kbd>H</kbd> on the map halts.</td></tr>
@@ -40,6 +41,7 @@ export const SeaGuide = () => (
     <h3>Controls</h3>
     <table><tbody>
       <tr><td><b>Click / tap</b></td><td>Select a squadron or ship; click open water to set a course. Right-click also sets a course.</td></tr>
+      <tr><td><b>Zoom</b></td><td>Mouse wheel or pinch to zoom; drag to pan. <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> or the buttons at bottom right.</td></tr>
       <tr><td><kbd>Space</kbd></td><td>Pause or resume. Orders can be given while paused.</td></tr>
       <tr><td><kbd>A</kbd> <kbd>D</kbd></td><td>Battle: put the helm over to port / starboard (15° per press).</td></tr>
       <tr><td><kbd>W</kbd> <kbd>S</kbd></td><td>Battle: more / less sail.</td></tr>

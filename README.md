@@ -27,6 +27,7 @@ npm test           # simulation rule tests (headless)
 | Select | click / tap a crimson round banner | click / tap a round-ringed squadron or ship |
 | Move / attack | click a destination or an enemy (right-click also works) | click open water or an enemy |
 | Pause, speed | `Space`, and the 1× 2× 4× buttons | same |
+| Zoom, pan | mouse wheel or pinch to zoom, drag to pan; `+` `−` `0` keys and the on-screen buttons (works in battles too) | same |
 | Cancel / menu | `Esc` | `Esc` |
 | Battle | `1`–`4` all / knights / barbarians / archers · `A` advance · `T` attack · `H` hold · `F` fall back · `Enter` begin · click the field to move | `A` `D` helm · `W` `S` sail · `Q` `E` fire port / starboard · `B` board · `Tab` next ship |
 

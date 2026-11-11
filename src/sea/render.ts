@@ -232,7 +232,7 @@ export function drawSea(ctx: CanvasRenderingContext2D, v: View, st: SeaState, ui
   for (const q of st.squadrons) drawSquadron(ctx, st, q, q.id === ui.selected, q.id === ui.hover, t);
   ctx.restore(); ctx.restore();
   const r = clamp(v.scale * 66, 16, 52);
-  drawCompass(ctx, v.ox + 22 * v.scale + r + 18, v.oy + SEA.h * v.scale - 22 * v.scale - r * 1.85, r, st.wind, sel ? sel.heading : null);
+  drawCompass(ctx, Math.max(v.ox + 22 * v.scale, 8) + r + 18, Math.min(v.oy + SEA.h * v.scale - 22 * v.scale, ch - 8) - r * 1.85, r, st.wind, sel ? sel.heading : null);
 }
 function drawSquadron(ctx: CanvasRenderingContext2D, st: SeaState, q: Squadron, sel: boolean, hover: boolean, t: number) {
   const ships = shipsOf(st, q), n = ships.length;
@@ -321,7 +321,7 @@ export function drawSeaBattle(ctx: CanvasRenderingContext2D, v: View, st: SeaSta
   }
   ctx.restore(); ctx.restore();
   const r = clamp(v.scale * 60, 16, 56);
-  drawCompass(ctx, v.ox + 14 * v.scale + r + 18, v.oy + ARENA.h * v.scale - 14 * v.scale - r * 1.85, r, st.wind, sel ? sel.heading : null);
+  drawCompass(ctx, Math.max(v.ox + 14 * v.scale, 8) + r + 18, Math.min(v.oy + ARENA.h * v.scale - 14 * v.scale, ch - 8) - r * 1.85, r, st.wind, sel ? sel.heading : null);
 }
 function drawUnit(ctx: CanvasRenderingContext2D, st: SeaState, b: SeaBattle, u: Unit, sel: boolean, t: number) {
   const s: Ship = shipOf(st, u), C = CLASS[s.cls];
